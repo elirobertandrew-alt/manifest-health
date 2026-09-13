@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "recipe": {
+    "name": "Node.js app",
+    "kind": "node",
+    "bootstrap": [
+      "npm install"
+    ],
+    "build": [
+      "npm run typecheck"
+    ],
+    "test": [],
+    "start": "npm run start",
+    "port": 8081,
+    "readinessPath": "/",
+    "evidence": [
+      "Detected package.json",
+      "Package manager: npm",
+      "Scripts: start, android, ios, web, typecheck, build:web, predeploy, deploy"
+    ]
+  },
+  "updatedAt": "2026-09-13T22:56:56.005916+00:00"
+}
