@@ -25,7 +25,7 @@
     "typecheck": "tsc --noEmit",
     "build:web": "expo export --platform web --output-dir dist --clear && node -e \"require('fs').writeFileSync('dist/.nojekyll','')\"",
     "predeploy": "npm run typecheck && npm run build:web",
-    "deploy": "gh-pages -d dist -t -m \"Publish web build\""
+    "deploy": "gh-pages -d dist -t --remove \"**/*\" -m \"Publish web build\""
   },
   "private": true
 }
