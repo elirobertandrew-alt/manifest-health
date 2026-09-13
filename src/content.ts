@@ -41,31 +41,35 @@ export const goals: Array<{ key: GoalKey; icon: string; title: string; copy: str
   { key: 'calm', icon: '≈', title: 'Less stress', copy: 'Create more room to reset and breathe' },
 ];
 
-export const goalCopy: Record<GoalKey, { headline: string; habit: string; why: string }> = {
+export const goalCopy: Record<GoalKey, { headline: string; habit: string; when: string; why: string }> = {
   energy: {
     headline: 'Feel energized every day',
     habit: '10-minute morning walk',
+    when: 'Morning · 10 min',
     why: 'A short walk after waking can help your body clock and daytime alertness.',
   },
   sleep: {
     headline: 'Wake up feeling restored',
     habit: 'Screen-free wind-down',
+    when: 'Evening · 15 min',
     why: 'Dim light and fewer screens before bed can make it easier to settle.',
   },
   strength: {
     headline: 'Build everyday strength',
     habit: '20-minute strength session',
+    when: 'Afternoon · 20 min',
     why: 'Regular, modest movement is often easier to keep than rare intense workouts.',
   },
   calm: {
     headline: 'Make calm your baseline',
     habit: '5-minute breathing reset',
+    when: 'Anytime · 5 min',
     why: 'Slow breathing can give your nervous system a short, repeatable pause.',
   },
 };
 
 export const defaultHabits = (goal: GoalKey): Habit[] => [
-  { id: 'focus', title: goalCopy[goal].habit, when: 'Morning · 10 min', why: goalCopy[goal].why, done: false },
+  { id: 'focus', title: goalCopy[goal].habit, when: goalCopy[goal].when, why: goalCopy[goal].why, done: false },
   { id: 'water', title: 'Drink a full glass of water', when: 'Anytime · 1 min', why: 'A simple cue that helps you pause and start the day with care.', done: false },
   { id: 'reflect', title: 'Two-minute evening reflection', when: 'Evening · 2 min', why: 'Noticing one helpful choice can make the next one easier.', done: false },
 ];
