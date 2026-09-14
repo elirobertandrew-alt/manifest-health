@@ -1,10 +1,11 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, Text, View } from 'react-native';
-import { Onboarding } from './src/Onboarding';
+import { Onboarding, StepId } from './src/Onboarding';
 import { Goals, Insights, OverlayScreen, Profile, Today } from './src/screens';
-import { AppState, GoalKey, Overlay, Tab, createState, defaultHabits } from './src/content';
-import { loadState, saveState } from './src/storage';
+import { AppState, GoalKey, Overlay, Tab } from './src/content';
+import { Answers, buildPlan, createState, sampleAnswers } from './src/onboardingModel';
+import { Draft, clearAll, loadDraft, loadState, saveDraft, saveState } from './src/storage';
 import { styles } from './src/theme';
 
 function Dashboard({
@@ -19,36 +20,28 @@ function Dashboard({
   const [tab, setTab] = useState<Tab>('Today');
   const [overlay, setOverlay] = useState<Overlay | null>(null);
 
-  const update = (patch: Partial<AppState> | ((current: AppState) => AppState)) => {
-    setState(typeof patch === 'function' ? patch(state) : { ...state, ...patch });
-  };
+  const update = (patch: Partial<AppState>) => setState({ ...state, ...patch });
+
+  const toggleHabit = (index: number) =>
+    update({ habits: state.habits.map((habit, i) => (i === index ? { ...habit, done: !habit.done } : habit)) });
 
   const content = useMemo(() => {
     if (tab === 'Today') {
-      return (
-        <Today
-          state={state}
-          onToggle={(index) =>
-            update({
-              habits: state.habits.map((habit, i) => (i === index ? { ...habit, done: !habit.done } : habit)),
-            })
-          }
-          onMood={(mood) => update({ mood })}
-          onOpen={setOverlay}
-        />
-      );
+      return <Today state={state} onToggle={toggleHabit} onMood={(mood) => update({ mood })} onOpen={setOverlay} />;
     }
     if (tab === 'Goals') {
       return (
         <Goals
           state={state}
-          onSelectGoal={(goal: GoalKey) =>
+          onSelectGoal={(goal: GoalKey) => {
+            const next = buildPlan({ ...state.answers, goal });
             update({
               goal,
               customHeadline: '',
-              habits: defaultHabits(goal).map((habit, index) => ({ ...habit, done: state.habits[index]?.done ?? false })),
-            })
-          }
+              answers: { ...state.answers, goal },
+              habits: next.habits.map((habit, index) => ({ ...habit, done: state.habits[index]?.done ?? false })),
+            });
+          }}
           onAddIntention={(title) =>
             update({
               customHeadline: title,
@@ -73,17 +66,12 @@ function Dashboard({
             overlay={overlay}
             state={state}
             onClose={() => setOverlay(null)}
-            onToggle={(index) =>
-              update({
-                habits: state.habits.map((habit, i) => (i === index ? { ...habit, done: !habit.done } : habit)),
-              })
-            }
+            onToggle={toggleHabit}
             onSaveReflection={(reflection) => update({ reflection })}
             onRenameHabit={(index, title) =>
-              update({
-                habits: state.habits.map((habit, i) => (i === index ? { ...habit, title } : habit)),
-              })
+              update({ habits: state.habits.map((habit, i) => (i === index ? { ...habit, title } : habit)) })
             }
+            onSetReminder={(reminder) => update({ reminder, answers: { ...state.answers, reminder } })}
           />
         ) : (
           content
@@ -115,19 +103,46 @@ function Dashboard({
 export default function App() {
   const [ready, setReady] = useState(false);
   const [state, setState] = useState<AppState | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   useEffect(() => {
-    loadState().then((saved) => {
+    Promise.all([loadState(), loadDraft()]).then(([saved, savedDraft]) => {
       setState(saved);
+      setDraft(savedDraft);
       setReady(true);
     });
   }, []);
 
   useEffect(() => {
-    if (ready) {
-      void saveState(state);
-    }
+    if (ready) void saveState(state);
   }, [state, ready]);
+
+  // Persist onboarding progress so a closed tab does not cost the answers.
+  const onProgress = useCallback(
+    (step: StepId, answers: Answers) => {
+      void saveDraft({ step, answers });
+    },
+    [],
+  );
+
+  const finish = useCallback((answers: Answers, sessionDone: boolean) => {
+    const next = createState(answers);
+    setState({ ...next, firstSessionDone: sessionDone });
+    setDraft(null);
+    void saveDraft(null);
+  }, []);
+
+  const skip = useCallback(() => {
+    setState(createState(sampleAnswers));
+    setDraft(null);
+    void saveDraft(null);
+  }, []);
+
+  const reset = useCallback(() => {
+    setState(null);
+    setDraft(null);
+    void clearAll();
+  }, []);
 
   if (!ready) {
     return <View style={styles.webBackdrop} />;
@@ -136,11 +151,14 @@ export default function App() {
   return (
     <View style={styles.webBackdrop}>
       {state ? (
-        <Dashboard state={state} setState={setState} onReset={() => setState(null)} />
+        <Dashboard state={state} setState={setState} onReset={reset} />
       ) : (
         <Onboarding
-          onFinish={(goal, name) => setState(createState(name, goal))}
-          onSkip={() => setState(createState('Alex', 'energy'))}
+          initialAnswers={draft?.answers}
+          initialStep={draft?.step}
+          onFinish={finish}
+          onSkip={skip}
+          onProgress={onProgress}
         />
       )}
     </View>

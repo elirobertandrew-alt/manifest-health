@@ -1,4 +1,6 @@
-export type GoalKey = 'energy' | 'sleep' | 'strength' | 'calm';
+import type { Answers } from './onboardingModel';
+
+export type GoalKey = 'energy' | 'sleep' | 'strength' | 'calm' | 'explore';
 export type Tab = 'Today' | 'Goals' | 'Insights' | 'You';
 export type Overlay =
   | { kind: 'guide' }
@@ -6,6 +8,7 @@ export type Overlay =
   | { kind: 'reflection' }
   | { kind: 'settings'; topic: string }
   | { kind: 'editHabits' }
+  | { kind: 'plan' }
   | { kind: 'details' };
 
 export type Habit = {
@@ -32,6 +35,11 @@ export type AppState = {
   reflection: string;
   startedAt: string;
   day: number;
+  /** Everything the onboarding learned, kept so the app can stay personal. */
+  answers: Answers;
+  reminder: string;
+  committed: boolean;
+  firstSessionDone: boolean;
 };
 
 export const goals: Array<{ key: GoalKey; icon: string; title: string; copy: string }> = [
@@ -39,6 +47,7 @@ export const goals: Array<{ key: GoalKey; icon: string; title: string; copy: str
   { key: 'sleep', icon: '◒', title: 'Better sleep', copy: 'Build a calmer wind-down routine' },
   { key: 'strength', icon: '+', title: 'Feel stronger', copy: 'Move consistently and build confidence' },
   { key: 'calm', icon: '≈', title: 'Less stress', copy: 'Create more room to reset and breathe' },
+  { key: 'explore', icon: '?', title: 'Still figuring it out', copy: 'Start somewhere small and find out' },
 ];
 
 export const goalCopy: Record<GoalKey, { headline: string; habit: string; when: string; why: string }> = {
@@ -66,13 +75,13 @@ export const goalCopy: Record<GoalKey, { headline: string; habit: string; when: 
     when: 'Anytime · 5 min',
     why: 'Slow breathing can give your nervous system a short, repeatable pause.',
   },
+  explore: {
+    headline: 'Find what actually helps you',
+    habit: 'One small thing, noticed',
+    when: 'Anytime · 10 min',
+    why: 'Starting broad is fine. Repetition teaches you more than picking the perfect first thing.',
+  },
 };
-
-export const defaultHabits = (goal: GoalKey): Habit[] => [
-  { id: 'focus', title: goalCopy[goal].habit, when: goalCopy[goal].when, why: goalCopy[goal].why, done: false },
-  { id: 'water', title: 'Drink a full glass of water', when: 'Anytime · 1 min', why: 'A simple cue that helps you pause and start the day with care.', done: false },
-  { id: 'reflect', title: 'Two-minute evening reflection', when: 'Evening · 2 min', why: 'Noticing one helpful choice can make the next one easier.', done: false },
-];
 
 export const guideSteps = [
   { step: '01', title: 'Get outdoor light early', body: 'A few minutes of outdoor light soon after waking can support daytime alertness and your sleep-wake rhythm.' },
@@ -84,39 +93,25 @@ export const guideSteps = [
 export const settingsCopy: Record<string, { title: string; body: string }> = {
   'Personal details': {
     title: 'Personal details',
-    body: 'Your name stays on this device in this prototype. A later version can add accounts if you want sync across phones.',
+    body: 'Your name and answers stay on this device in this prototype. A later version can add accounts if you want sync across phones.',
   },
   'Reminders & routine': {
     title: 'Reminders & routine',
-    body: 'This clickable template does not send notifications yet. The intended design is one gentle reminder for your first action, never medical alerts.',
+    body: 'You chose your reminder during onboarding, and you can turn it off at any time. The intended design is one gentle nudge for your first action — never medical alerts, never a guilt trip for a missed day.',
   },
   'Privacy & data': {
     title: 'Privacy & data',
-    body: 'Choices are stored locally on this device. There is no cloud account, no health-record upload, and no advertising profile in this prototype.',
+    body: 'Choices are stored locally on this device. There is no cloud account, no health-record upload, and no advertising profile. Health answers are never shared with third parties for marketing or data mining.',
   },
   'Health guidance preferences': {
     title: 'Health guidance preferences',
-    body: 'Manifest Health shares general wellness education. It does not diagnose, treat, or replace care from a qualified professional.',
+    body: 'Manifest Health shares general wellness education. It does not diagnose, treat, or replace care from a qualified professional. Plans are capped at gentle, non-restrictive targets on purpose.',
   },
   'Help & support': {
     title: 'Help & support',
-    body: 'Use Replay onboarding to walk the template again. For real health questions, talk with a clinician who knows your history.',
+    body: 'Use Replay onboarding to walk the flow again. For real health questions, talk with a clinician who knows your history.',
   },
 };
-
-export function createState(name: string, goal: GoalKey): AppState {
-  return {
-    name,
-    goal,
-    customHeadline: '',
-    intentions: [],
-    habits: defaultHabits(goal),
-    mood: 3,
-    reflection: '',
-    startedAt: new Date().toISOString(),
-    day: 1,
-  };
-}
 
 export function headlineFor(state: AppState): string {
   return state.customHeadline.trim() || goalCopy[state.goal].headline;

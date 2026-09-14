@@ -2,6 +2,9 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Button } from './Button';
 import { AppState, GoalKey, Habit, Overlay, goals, guideSteps, headlineFor, settingsCopy } from './content';
+import { buildPlan, patternInsight, reminderOptions } from './onboardingModel';
+import { onb } from './onboardingTheme';
+import { ChipRow, ProjectionChart } from './onboardingWidgets';
 import { styles } from './theme';
 
 function Ring({ value }: { value: number }) {
@@ -65,6 +68,10 @@ export function Today({
           <Text style={styles.sectionMeta}>EDIT</Text>
         </Pressable>
       </View>
+      <Text style={[styles.habitTime, { marginTop: -6, marginBottom: 12 }]}>
+        {state.reminder ? `Reminder set for ${state.reminder}` : 'No reminder set'}
+        {state.firstSessionDone ? ' · first session done during setup' : ''}
+      </Text>
       <View style={styles.habitCard}>
         {state.habits.map((habit, index) => (
           <Pressable
@@ -221,8 +228,9 @@ export function Insights({
   state: AppState;
   onOpen: (overlay: Overlay) => void;
 }) {
-  const bars = [38, 55, 48, 72, 64, 84, 76];
-  const empty = state.habits.every((habit) => !habit.done) && !state.reflection;
+  const plan = buildPlan(state.answers);
+  const pattern = patternInsight(state.answers);
+  const empty = state.habits.every((habit) => !habit.done) && !state.reflection && !state.firstSessionDone;
 
   return (
     <ScrollView style={styles.content} contentContainerStyle={styles.dashboardPad} showsVerticalScrollIndicator={false}>
@@ -243,26 +251,26 @@ export function Insights({
               <Text style={styles.streakBody}>Your longest yet — keep it kind.</Text>
             </View>
           </View>
-          <View style={styles.chartCard}>
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Daily energy</Text>
-              <Text style={styles.greenText}>check-in {['Low', 'Flat', 'Okay', 'Good', 'Great'][state.mood]}</Text>
-            </View>
-            <View style={styles.chart}>
-              {bars.map((height, index) => (
-                <View key={index} style={styles.barWrap}>
-                  <View style={[styles.bar, { height }, index === 5 && styles.barHighlight]} />
-                  <Text style={styles.barLabel}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][index]}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
         </>
       )}
+      <View style={onb.chartCard}>
+        <View style={onb.chartHead}>
+          <Text style={onb.chartTitle}>Where you started, where this goes</Text>
+          <Text style={onb.chartTag}>BY {plan.targetDate.toUpperCase()}</Text>
+        </View>
+        <Text style={onb.chartBody}>
+          Your baseline was {plan.readiness} out of 100 — {plan.readinessLabel.toLowerCase()}. Today’s check-in reads{' '}
+          {['low', 'flat', 'okay', 'good', 'great'][state.mood]}.
+        </Text>
+        <ProjectionChart projection={plan.projection} />
+        <Text style={onb.chartFoot}>
+          Projected from your onboarding answers, not measured. A missed day costs far less than this chart suggests.
+        </Text>
+      </View>
       <View style={styles.insightCard}>
         <Text style={styles.insightTag}>PATTERN FOUND</Text>
-        <Text style={styles.insightTitle}>Morning movement is working</Text>
-        <Text style={styles.insightBody}>People often notice steadier afternoons after a short outdoor walk. Treat that as a clue, not a diagnosis.</Text>
+        <Text style={styles.insightTitle}>{pattern.title}</Text>
+        <Text style={styles.insightBody}>{pattern.body}</Text>
       </View>
       <View style={styles.insightCardWhite}>
         <Text style={styles.insightTagBlue}>WEEKLY REFLECTION</Text>
@@ -284,6 +292,7 @@ export function Profile({
   onReset: () => void;
 }) {
   const started = new Date(state.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const plan = buildPlan(state.answers);
   return (
     <ScrollView style={styles.content} contentContainerStyle={styles.dashboardPad} showsVerticalScrollIndicator={false}>
       <Text style={styles.kicker}>YOUR SPACE</Text>
@@ -293,6 +302,27 @@ export function Profile({
         <Text style={styles.profileName}>{state.name}</Text>
         <Text style={styles.profileSince}>Building healthy momentum since {started}</Text>
       </View>
+      <View style={onb.scoreCard}>
+        <Text style={onb.scoreKicker}>FROM YOUR ONBOARDING</Text>
+        <View style={onb.scoreRow}>
+          <Text style={onb.scoreValue}>{plan.readiness}</Text>
+          <Text style={onb.scoreOutOf}>/100</Text>
+          <Text style={onb.scoreLabel}>{plan.readinessLabel}</Text>
+        </View>
+        <Text style={onb.scoreBody}>
+          {plan.focusNote} {state.reminder ? `One reminder a day at ${state.reminder}.` : 'Reminders are off.'}
+          {state.committed ? ' You made the day-one promise.' : ''}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Your plan and answers"
+        onPress={() => onOpen({ kind: 'plan' })}
+        style={styles.settingsRow}
+      >
+        <Text style={styles.settingsText}>Your plan & answers</Text>
+        <Text style={styles.chevron}>›</Text>
+      </Pressable>
       {Object.keys(settingsCopy).map((item) => (
         <Pressable
           key={item}
@@ -398,6 +428,7 @@ export function OverlayScreen({
   onToggle,
   onSaveReflection,
   onRenameHabit,
+  onSetReminder,
 }: {
   overlay: Overlay;
   state: AppState;
@@ -405,6 +436,7 @@ export function OverlayScreen({
   onToggle: (index: number) => void;
   onSaveReflection: (value: string) => void;
   onRenameHabit: (index: number, title: string) => void;
+  onSetReminder: (reminder: string) => void;
 }) {
   if (overlay.kind === 'guide') {
     return (
@@ -462,6 +494,63 @@ export function OverlayScreen({
           <HabitEditor key={habit.id} habit={habit} onRename={(title) => onRenameHabit(index, title)} />
         ))}
         <Text style={styles.footerNote}>Keep actions small enough that a busy day can still hold them.</Text>
+      </Sheet>
+    );
+  }
+
+  if (overlay.kind === 'plan') {
+    const plan = buildPlan(state.answers);
+    return (
+      <Sheet title="Your plan & answers" kicker="FROM YOUR ONBOARDING" onClose={onClose}>
+        <View style={onb.chartCard}>
+          <View style={onb.chartHead}>
+            <Text style={onb.chartTitle}>If you keep the rhythm</Text>
+            <Text style={onb.chartTag}>BY {plan.targetDate.toUpperCase()}</Text>
+          </View>
+          <Text style={onb.chartBody}>Projected from the baseline you described during onboarding.</Text>
+          <ProjectionChart projection={plan.projection} />
+          <Text style={onb.chartFoot}>
+            Illustrative only. Real progress is uneven, and a missed day costs far less than the chart suggests.
+          </Text>
+        </View>
+
+        <View style={styles.article}>
+          <Text style={styles.articleStep}>WHAT YOU TOLD US</Text>
+          <Text style={styles.articleTitle}>{headlineFor(state)}</Text>
+          <Text style={styles.articleBody}>{plan.focusNote}</Text>
+        </View>
+
+        {plan.obstaclePlan.length > 0 && (
+          <View style={styles.article}>
+            <Text style={styles.articleStep}>PLANNED AROUND</Text>
+            {plan.obstaclePlan.map((item) => (
+              <View key={item.obstacle} style={{ marginBottom: 12 }}>
+                <Text style={onb.answerObstacle}>{item.obstacle}</Text>
+                <Text style={styles.articleBody}>{item.answer}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.article}>
+          <Text style={styles.articleStep}>DAILY REMINDER</Text>
+          <Text style={styles.articleBody}>
+            {state.reminder
+              ? `One nudge a day at ${state.reminder}, for your first action only.`
+              : 'Reminders are off. Pick a time below if you want one gentle nudge a day.'}
+          </Text>
+          <View style={{ marginTop: 14 }}>
+            <ChipRow options={reminderOptions} value={state.reminder} onChange={onSetReminder} />
+          </View>
+          {state.reminder ? (
+            <View style={{ marginTop: 14 }}>
+              <Button label="Turn reminders off" secondary onPress={() => onSetReminder('')} />
+            </View>
+          ) : null}
+          <Text style={styles.footerNote}>
+            This prototype records the preference without sending real notifications.
+          </Text>
+        </View>
       </Sheet>
     );
   }
